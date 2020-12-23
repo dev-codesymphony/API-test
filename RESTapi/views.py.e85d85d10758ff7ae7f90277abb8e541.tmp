@@ -1,0 +1,128 @@
+import glove
+import os
+import requests
+import shutil
+from django.shortcuts import render
+from rest_framework.views import APIView
+from django.http import JsonResponse
+from rest_framework.response import Response
+
+import tensorflow as tf
+import numpy as np
+from tensorflow import keras
+from tensorflow.keras.models import load_model
+from rest_framework.permissions import AllowAny
+from django.views.generic.base import TemplateView
+
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
+from .serializers import (
+    ClassificationGetResponseSerializer,
+    ClassificationPostRequestSerializer,
+    ClassificationPostSuccessResponseSerializer,
+    ClassificationPostErrorResponseSerializer
+)
+
+# category labels
+main_labels = ['confident', 'unconfident',
+               'pos_hp', 'neg_hp',
+               'interested', 'uninterested',
+               'happy', 'unhappy',
+               'friendly', 'unfriendly'
+               ]
+
+# to dictionary
+label_dict = dict(zip(main_labels, range(0, len(main_labels))))
+
+# inverting label_dict
+inv_label = {v: k for k, v in label_dict.items()}
+
+# Load the pretrained model
+model = load_model('RESTapi/tfjsmodel.h5')
+#model = load_model('C:\\Users\\Acer\\Documents\\coding\\Upwork\\Sent Rest-API\\RESTapi\\tfmodel.h5')
+
+def word_prediction(word):
+  train_data, test_data = get_train_test_data(version='1')
+  
+  knnCluster (train_data ,
+               num_clusters = conf.num_clusters,
+               columns=['Valence', 'Arousal','Dominance'],
+               verbose=0)
+
+  V_pred, A_pred, D_pred = predict(train_data, word, top_word=conf.top_word, top_cluster=conf.top_cluster,
+                                  threshold=conf.threshold,
+                                  use_emotional_lexicon=False,
+                                  verbose=conf.verbose)
+  
+  return V_pred, A_pred, D_pred
+
+
+def predict_class(word):
+  """
+  predict the sentiment of the word
+
+  word : input word
+  return : class of the word
+  """
+  Valence, Arousal, Dominance = word_prediction(word)
+  sentiment = predict_class(word, Valence, Arousal, Dominance)
+
+  return sentiment
+
+
+classificationPostSuccessResponseSerializer = openapi.Response(
+    'Success classification', ClassificationPostSuccessResponseSerializer)
+
+classificationPostErrorResponseSerializer = openapi.Response(
+    'Error on classification', ClassificationPostErrorResponseSerializer)
+
+classificationGetResponse = openapi.Response(
+    'Post request information', ClassificationGetResponseSerializer)
+
+# Classification call class
+
+
+class Classification(APIView):
+
+    permission_classes = (AllowAny,)
+
+    @swagger_auto_schema(
+        operation_description="Get classification request information",
+        responses={
+            200: classificationGetResponse
+        }
+    )
+    def get(self, request, format=None):
+        """API View"""
+        data_view = ['word', 'valence', 'arousal', 'dominance']
+        return Response({'url': '/classification',
+                         'type': 'POST',
+                         'data': data_view,
+                         'code': 200,
+                         'status': 'Success'
+                         })
+
+    @swagger_auto_schema(
+        request_body=ClassificationPostRequestSerializer,
+        responses={
+            200: classificationPostSuccessResponseSerializer,
+            400: classificationPostErrorResponseSerializer
+        }
+    )
+    def post(self, request):
+        try:
+            # word to predict with VAD values
+            word = request.data.get('word') or ''
+
+            # calling prediction function
+            pred = predict_class(word)
+            print('Prediction: {}'.format(pred))
+
+            return JsonResponse({'message': 'Prediction: ' + str(pred), 'code': 200, 'status': 'Success'})
+        except Exception as e:
+            print('email error:', e)
+            return JsonResponse({'message': 'Something went wrong', 'code': 400, 'status': 'Error', 'error': str(e)})
+
+
+class Home(TemplateView):
+    template_name = ('home.html')
