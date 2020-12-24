@@ -54,6 +54,10 @@ glove_vectors = KeyedVectors.load(os.path.abspath("glove-twitter-50.kv"))
 ##################################################################################################################################################################
 
 
+#glove_dir = './data/RNN/'
+glove_100k_50d = "glove.first-100k.6B.50d.txt"
+#glove_100k_50d_path = os.path.join(glove_100k_50d)
+
 glove_100k_50d_path = os.path.abspath("glove.first-100k.6B.50d.txt")
 
 # These are temporary files if we need to download it from the original source (slow)
